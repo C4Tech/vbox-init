@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# VirtualBox Hypervisor startup script
+
+# update-rc.d vbox-init start 90 2 3 4 5 . stop 10 0 1 6 . 
+# description: VirtualBox web service API
+#
+### BEGIN INIT INFO
+# Provides:       vbox-init
+# Required-Start: vboxdrv
+# Required-Stop:  vboxdrv
+# Default-Start:  2 3 4 5
+# Default-Stop:   0 1 6
+# Description:    VirtualBox Hypervisor
+### END INIT INFO
+
+PATH=$PATH:/bin:/sbin:/usr/sbin
+DEBIAN=yes
+NOLSB=
+
+[ -f /lib/lsb/init-functions ] || NOLSB=yes
+[ -f /etc/vbox/vbox.cfg ] && . /etc/vbox/vbox.cfg
+
+# VBOXUSER,VBOXSCRIPT and VBOXSTART come from here:
+[ -r /etc/default/virtualbox ] && . /etc/default/virtualbox
+
+if [ -z $VBOXUSER ] ; then
+ echo "VBOXUSER not defined, see /etc/default/virtualbox"
+ exit 0
+fi
+
+if [ ! -x $VBOXSCRIPT ] ; then
+ echo "VBOXSCRIPT does not exist or is not executable, see /etc/default/virtualbox"
+fi
+
+if [ ! $VBOXSTART = yes ] ; then
+ echo "Virtual Box not configured to auto-start VMs, exiting ..."
+fi 
+
+if [ ! -f $VMLIST ] ; then
+ echo "VMLIST doesn't exist, see /etc/default/virtualbox"
+fi
+
+case $1 in
+
+
+ start)
+
+        /bin/su $VBOXUSER -c "$VBOXSCRIPT start"
+ 
+ ;;
+
+
+ stop)
+
+        /bin/su $VBOXUSER -c "$VBOXSCRIPT stopall"
+
+ ;;
+
+ status)
+        echo "Virtual Machines running on this host as $VBOXUSER:"
+        /bin/su $VBOXUSER -c "$VBOXSCRIPT status"
+ ;;
+
+
+ *)
+
+        echo "Usage: start|stop|status "
+
+ ;;
+
+esac
