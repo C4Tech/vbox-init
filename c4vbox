@@ -1,0 +1,273 @@
+#!/bin/bash
+# set -x
+
+# This must be run as the virtual box user (usually "vbox") and NO ONE ELSE
+# it is meant to be run with variables set in /etc/default/virtualbox
+# $VMLIST should be a UNIX text file formatted like:
+# "VMNAME:UUID:VRDEPORT"
+
+# problems:
+# can't set the vrde port on a vm that is in a saved state that
+# already has it's vrde port configured to something else, since it isn't mutable. SO:
+# we wait 10 seconds and use vboxmanage controlvm to do this after startup
+
+# set these for your environment
+
+VBOXHEADLESS=/usr/bin/vboxheadless
+VBOXMNG=/usr/bin/vboxmanage
+# in case env wasn't inherited from su or is run by VBOXUSER directly
+test -f /etc/default/virtualbox && . /etc/default/virtualbox
+
+# nothing else configurable below this line
+
+# set field separator so our for loops work
+IFS=$'\n'
+
+# function to ignore comments
+strip_comments (){
+    grep -v '^[[:space:]]*#'
+}
+
+
+if [ ! $USER = $VBOXUSER ] ; then
+
+ echo "This script is meant to be run as $VBOXUSER. It won't run as you so just give up"
+ exit 1
+fi
+case $1 in
+
+
+start)
+
+        for line in `cat ${VMLIST} | strip_comments`
+                do
+                VM=`echo $line | awk -F: '{print $1}'`
+                VBUUID=`echo $line | awk -F: '{print $2}'`
+                VRDEPORT=`echo $line | awk -F: '{print $3}'`
+                # make sure the VM is not already started
+                 $VBOXMNG list runningvms | grep $VBUUID > /dev/null
+                 if [ $? = 1 ] ; then
+                     echo "Starting $VM with UUID $VBUUID"
+                     $VBOXHEADLESS  --startvm $VBUUID &
+                     sleep 15
+                     echo "Setting VRDE port on $VM to $VRDEPORT"
+                     $VBOXMNG controlvm $VBUUID vrdeport $VRDEPORT
+                     sleep 1
+                     echo "done"
+                 else
+                     echo "$VM is already running"
+                 fi
+
+                done
+
+        ;;
+
+stop)
+        for line in `cat ${VMLIST} | strip_comments`
+                do
+                   VM=`echo $line | awk -F: '{print $1}'`
+                   VBUUID=`echo $line | awk -F: '{print $2}'`
+                # make sure the VM is not already stopped
+                 $VBOXMNG list runningvms | grep $VBUUID > /dev/null
+                 if [ $? = 0 ] ; then
+                     echo "Saving state of ${VM} with UUID ${VBUUID}"
+                     $VBOXMNG controlvm ${VBUUID} savestate
+                 else
+                     echo "$VM is not running anyway, continuing ..."
+                 fi
+
+
+                done
+        ;;
+
+stopall)
+
+       $VBOXMNG list runningvms | sed 's/ {/:/g' | sed 's/}//g' > /tmp/allvmlist.tmp
+       VMLISTALL=/tmp/allvmlist.tmp
+        for line in `cat ${VMLISTALL}`
+                do
+                   VM=`echo $line | awk -F: '{print $1}'`
+                   VBUUID=`echo $line | awk -F: '{print $2}'`
+                   echo "Saving state of ${VM} with UUID ${VBUUID}"
+                   $VBOXMNG controlvm ${VBUUID} savestate
+                done
+        rm -f $VMLISTALL
+        ;;
+
+poweroff)
+        for line in `cat ${VMLIST} | strip_comments`
+                do
+                   VM=`echo $line | awk -F: '{print $1}'`
+                   VBUUID=`echo $line | awk -F: '{print $2}'`
+                   echo "POWERING OFF ${VM} with UUID ${VBUUID}"
+                   echo "Are you SURE you want to poweroff the VM? (y|n)"
+           
+                   read QUESTION
+
+                   case "$QUESTION" in 
+                       y|Y|yes|Yes) echo "OK, pulling the plug on ${VM}"
+                          $VBOXMNG controlvm ${VBUUID} poweroff
+                        
+                           ;;
+
+                       n|N|no|No) echo "Good choice. Use "stop" instead"
+                           ;;
+                       *)  echo "Uh, please type "y" or "n". Quitting."
+                           exit 0
+
+                           ;;
+                   esac
+
+                done
+
+
+        ;;
+
+reset)
+        for line in `cat ${VMLIST} | strip_comments`
+                do
+                   VM=`echo $line | awk -F: '{print $1}'`
+                   VBUUID=`echo $line | awk -F: '{print $2}'`
+                   echo "Performing hardware reset of ${VM} with UUID ${VBUUID}"
+                   echo "Are you SURE you want to hard reset the VM? (y|n)"
+           
+                   read QUESTION
+
+                   case "$QUESTION" in 
+                       y|Y|yes|Yes) echo "OK, pulling the plug on ${VM}"
+                          $VBOXMNG controlvm ${VBUUID} reset
+                        
+                           ;;
+
+                       n|N|no|No) echo "Good choice. Use "stop" instead"
+                           ;;
+                       *)  echo "Uh, please type "y" or "n". Quitting."
+                           exit 0
+
+                           ;;
+                   esac
+
+                done
+
+        ;;
+
+
+listrunning)
+
+        $VBOXMNG list runningvms
+
+        ;;
+
+listall)
+        $VBOXMNG list vms
+
+        ;;
+
+config)
+        echo "Reconfiguring VRDE ports for VM's managed in $VMLIST"
+        for line in `cat ${VMLIST} | strip_comments`
+                do
+                VM=`echo $line | awk -F: '{print $1}'`
+                VBUUID=`echo $line | awk -F: '{print $2}'`
+                VRDEPORT=`echo $line | awk -F: '{print $3}'`
+
+                
+                $VBOXMNG controlvm $VBUUID vrdeport $VRDEPORT
+                done
+
+        ;;
+
+status)
+
+       echo "Status of VM's run as $VBOXUSER:"
+       $VBOXMNG list vms | sed 's/ {/:/g' | sed 's/}//g' > /tmp/allvmlist.tmp
+       VMLISTALL=/tmp/allvmlist.tmp
+
+       for line in `cat ${VMLISTALL}`
+       do
+                VM=`echo $line | awk -F: '{print $1}'`
+                VBUUID=`echo $line | awk -F: '{print $2}'`
+                STATE=`$VBOXMNG showvminfo --machinereadable $VBUUID | grep VMState= | awk -F= '{print $2}'`
+                OS=`$VBOXMNG showvminfo --machinereadable $VBUUID | grep OSType= | awk -F= '{print $2}'`
+                MEM=`$VBOXMNG showvminfo --machinereadable $VBUUID | grep memory= | awk -F= '{print $2}'`
+                cat $VMLIST | strip_comments | grep $VBUUID > /dev/null
+                if [ $? = 0 ] ; then
+                    echo "Virtual Machine $VM ($OS ${MEM}MB) is in state: $STATE (MANAGED)"
+                else
+                    echo "Virtual Machine $VM ($OS ${MEM}MB) is in state: $STATE (UNMANAGED)"
+                fi
+
+        done
+        /bin/rm -f /tmp/allvmlist.tmp
+
+        ;;
+
+
+createvmlist)
+       $VBOXMNG list vms | sed 's/ {/:/g' | sed 's/}//g' > /tmp/allvmlist.tmp
+       VMLISTALL=/tmp/allvmlist.tmp
+       NEWVMLIST=~/vmlist
+       cat /dev/null > $NEWVMLIST
+       VRDEPORT=4000
+        for line in `cat $VMLISTALL`
+        do
+
+            let "VRDEPORT+=1"
+            VM=`echo $line | awk -F: '{print $1}'`
+            VBUUID=`echo $line | awk -F: '{print $2}'`
+            echo $line:$VRDEPORT >> $NEWVMLIST
+            echo "Added $VM to $NEWVMLIST"
+        done
+       echo "You may now copy $NEWVMLIST to $VMLIST (as root)"
+       echo "Be sure to comment out and VM's you do NOT want managed by this script!"
+       rm -f $VMLISTALL
+
+       ;;
+
+setvrdeauth)
+
+       $VBOXMNG list vms | sed 's/ {/:/g' | sed 's/}//g' > /tmp/allvmlist.tmp
+       VMLISTALL=/tmp/allvmlist.tmp
+
+       for line in `cat ${VMLISTALL}`
+       do
+                VM=`echo $line | awk -F: '{print $1}'`
+                VBUUID=`echo $line | awk -F: '{print $2}'`
+                STATE=`$VBOXMNG showvminfo --machinereadable $VBUUID | grep VMState= | awk -F= '{print $2}' | sed 's/"//g'`
+                        cat $VMLIST | strip_comments | grep $VBUUID > /dev/null
+                        if [ $STATE = "poweroff" ] ; then
+                            $VBOXMNG  modifyvm  $VBUUID --vrdeauthtype null
+                            if [ $? = 0 ] ; then 
+                                echo "Successfullly set VRDE authtype to "external" for $VM"
+                            else
+                                echo "Unable to set VRDE authtype for $VM"
+                            fi
+                        else
+                            echo "Virtual Machine $VM is not in state: poweroff"
+                        fi
+
+        done
+
+       rm -f $VMLISTALL
+
+
+*)
+
+        echo "Usage: 
+             start: Start all VM's specified in $VMLIST
+             stop: Save the state of all VM's specified in $VMLIST
+             stopall: Save the state of all VM's running as $VBOXUSER on this system
+             poweroff: hard poweroff all VM's specified in $VMLIST 
+             reset: hard reset all VM's specified in $VMLIST
+             listrunning: list all VM's currently running as $VBOXUSER
+             listall: list all VM's (running or not) as $VBOXUSER
+             config: set the VRDE port for running VM's listed in $VMLIST
+             status: information about VM's managed by this script
+             createvmlist: create a vmlist suitable for use by this script
+             setvrdeauth: attempt to set VRDE authtype to external"
+
+        ;;
+esac
+
+
+        ;;  
