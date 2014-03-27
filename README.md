@@ -17,5 +17,11 @@ MACHINENAME:SID:REMOTEPORT
 
 To get an list of virtualbox run, as the vbox user
 
-
 vboxmanage list vms
+
+ - MACHINENAME = according to vbox
+ - SID
+
+vboxmanage showvminfo MACHINENAME| grep TCP/Ports
+
+ - REMOTEPORT
