@@ -3,7 +3,7 @@
 # VBOXUSER,VBOXSCRIPT and VBOXSTART defined here
 
 
-VBOXUSER=c4
+VBOXUSER=vbox
 VBOXSCRIPT=/usr/local/bin/c4vbox
 VMLIST=/etc/vbox/vmlist
 
