@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# VBOXUSER,VBOXSCRIPT and VBOXSTART defined here
+
+
+VBOXUSER=c4
+VBOXSCRIPT=/usr/local/bin/c4vbox
+VMLIST=/etc/vbox/vmlist
+
+# "yes" or "no"
+VBOXSTART=yes
