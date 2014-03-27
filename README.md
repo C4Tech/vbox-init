@@ -3,8 +3,14 @@ vbox-init
 
 a script to start vbox
 virtualbox goes in /etc/default/
-vbox-init goes in /etc/init.d/
 c4vbox goes in /usr/local/bin/
+vbox-init goes in /etc/init.d/
+
+Change name of vbox-init to just vbox
+
+Run the following to add starts to all the default run levels.
+
+update-rc.d vbox defaults
 
 
 You need to add /etc/vbox/vmlist and put your list of VMs
