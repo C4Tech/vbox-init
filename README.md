@@ -13,3 +13,9 @@ example
 MACHINENAME:SID:REMOTEPORT
 
 "winXP":506bbd28-14d3-4f46-899a-18205099a98f:4001
+
+
+To get an list of virtualbox run, as the vbox user
+
+
+vboxmanage list vms
